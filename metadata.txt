@@ -1,0 +1,27 @@
+[general]
+name=Auxiliary Window
+description=Plugin for open synchronized window with selected layers
+about=This plugin for open synchronized window with selected layers. 
+  The new window can add, remove, show, hide the layers.
+  The tools in new windows enable, show the cursor from main window(QGIS window), set the scale, show the extent of main window.
+  This plugin is developed on the demand of IBAMA(Brazilian Institute of Environment and Renewable Natural Resources)
+  http://www.ibama.gov.br
+  See video for use this plugin: ??
+
+version=0.1
+qgisMinimumVersion=2.8
+# category=
+author=Luiz Motta
+email=motta.luiz@gmail.com
+
+changelog=0.1
+  - Start of plugin
+  0.1
+  - 
+tags=synchronized,layers, windows, IBAMA
+homepage=https://github.com/lmotta/auxiliarywindow_plugin
+tracker=http://hub.qgis.org/projects/auxiliarywindow_plugin
+repository=https://github.com/lmotta/auxiliarywindow_plugin
+icon=auxiliarywindow.png
+experimental=True
+deprecated=False
