@@ -39,6 +39,7 @@ class AuxiliaryLegend( QDockWidget ):
   currentLayerChanged = pyqtSignal( "QgsMapLayer" )
   currentLayerQgis = pyqtSignal( "QgsMapLayer" )
   addSelectedLayersQgis = pyqtSignal()
+  removeLayer = pyqtSignal( "QgsMapLayer" )
   closed = pyqtSignal()
 
   def __init__( self, parent, numWin ):
@@ -53,7 +54,7 @@ class AuxiliaryLegend( QDockWidget ):
       self.tview.setSelectionMode( QAbstractItemView.ExtendedSelection )
       setModel()
       self.tview.currentLayerChanged.connect( self.currentLayerChanged.emit )
-    
+
     def setupUi():
       self.setAllowedAreas( Qt.LeftDockWidgetArea )
       winLegend.setWindowFlags( Qt.Widget )
@@ -134,7 +135,9 @@ class AuxiliaryLegend( QDockWidget ):
         map( lambda item: item.setVisible( checked ), nodes )
       else:
         ltg = self.model.rootGroup()
-        map( lambda item: ltg.removeChildNode( item ), nodes )
+        for node in nodes:
+          self.removeLayer.emit( node.layer() )
+          ltg.removeChildNode( node )
 
     # addLayer, currentLayer
     else: 
@@ -147,7 +150,7 @@ class MarkerWindow():
   def __init__(self, canvas):
     self.canvas = canvas
     self.markerBack = self.marker = None
-    
+
   def add(self):
     def createMarker( colorRGB, penWidth, iconSize, iconType ):
       marker = QgsVertexMarker( self.canvas )
@@ -292,6 +295,7 @@ class AuxiliaryWindow(QMainWindow):
       { 'signal': self.dockLegend.currentLayerChanged, 'slot': self.onCurrentLayerChanged },
       { 'signal': self.dockLegend.currentLayerQgis, 'slot': self.onCurrentLayerQgis },
       { 'signal': self.dockLegend.addSelectedLayersQgis, 'slot': self.onAddSelectedLayersQgis },
+      { 'signal': self.dockLegend.removeLayer, 'slot': self.onRemoveLayers },
       { 'signal': self.dockLegend.closed, 'slot': self.onClosedLegend },
       { 'signal': self.canvas.extentsChanged, 'slot': self.onExtentsChangedMirror },
       { 'signal': self.qgisCanvas.extentsChanged, 'slot': self.onExtentsChangedQgisCanvas },
@@ -340,6 +344,11 @@ class AuxiliaryWindow(QMainWindow):
    signal.disconnect( slot )
    func( arg )
    signal.connect( slot )
+
+  def _connectVectorRefresh(self, layer, isConnect=True):
+    if isinstance( layer, QgsVectorLayer ):
+      f = layer.editCommandEnded.connect if isConnect else layer.editCommandEnded.disconnect
+      f( self.canvas.refresh )
 
   def run(self):
 
@@ -412,6 +421,7 @@ class AuxiliaryWindow(QMainWindow):
         continue
       layer = node.layer()
       visible = Qt.Checked if visibles[ id ] else Qt.Unchecked
+      self._connectVectorRefresh( layer )
       self.ltg.addLayer( layer ).setVisible( visible )
     self.dockLegend.setBridge( self.canvas)
     
@@ -432,7 +442,7 @@ class AuxiliaryWindow(QMainWindow):
     self._connect( False )
     event.accept()
     self.closed.emit( self.numWin )
-  
+
   @pyqtSlot(int)
   def onValueChangedScale(self, scaleFactor):
     w = self.findChild( QCheckBox, 'renderCheck')
@@ -547,12 +557,8 @@ class AuxiliaryWindow(QMainWindow):
     ids = list( set( self.ltg.findLayerIds() ) & set( theLayerIds ) ) # intersection
     nodes = map( lambda item: self.ltg.findLayer( item ), ids )
     for item in nodes:
-      layer = item.layer()
-      if isinstance( layer, QgsVectorLayer ):
-        layer.editCommandEnded.disconnect( layer.triggerRepaint )
-
+      self._connectVectorRefresh( item.layer(), False )
       self.ltg.removeChildNode( item )
-
 
   @pyqtSlot()
   def onAddSelectedLayersQgis( self ):
@@ -564,8 +570,11 @@ class AuxiliaryWindow(QMainWindow):
     for item in layersQgis:
       if item in layers:
         self.ltg.addLayer( item )
-        if isinstance( item, QgsVectorLayer ):
-          item.editCommandEnded.connect( item.triggerRepaint  )
+        self._connectVectorRefresh( item )
+
+  @pyqtSlot( 'QgsMapLayer' )
+  def onRemoveLayers( self, layer ):
+    self._connectVectorRefresh(layer, False)
 
   @pyqtSlot('QgsMapLayer')
   def onCurrentLayerQgis(self, layer ):
@@ -598,7 +607,7 @@ class ContainerAuxiliaryWindow():
     self.parent = parent
     self.numWin = 0
     self.windows = {}
-    
+
   def run(self):
     self.numWin += 1
     self.windows[ self.numWin ] = AuxiliaryWindow( self.parent, self.parent.geometry(), self.numWin )
