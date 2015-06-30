@@ -28,7 +28,7 @@ from qgis.gui import  ( QgsRubberBand, QgsLayerTreeMapCanvasBridge, QgsLayerTree
                         QgsMapCanvas, QgsMapToolPan,
                         QgsVertexMarker, QgsMessageBar )
 from qgis.core import ( QGis, QgsMapLayerRegistry, QgsProject, QgsLayerTreeModel, QgsLayerTreeGroup,
-                        QgsGeometry, QgsRectangle, QgsPoint )
+                        QgsVectorLayer, QgsGeometry, QgsRectangle, QgsPoint )
 
 import locale
 import os
@@ -547,7 +547,12 @@ class AuxiliaryWindow(QMainWindow):
     ids = list( set( self.ltg.findLayerIds() ) & set( theLayerIds ) ) # intersection
     nodes = map( lambda item: self.ltg.findLayer( item ), ids )
     for item in nodes:
+      layer = item.layer()
+      if isinstance( layer, QgsVectorLayer ):
+        layer.editCommandEnded.disconnect( layer.triggerRepaint )
+
       self.ltg.removeChildNode( item )
+
 
   @pyqtSlot()
   def onAddSelectedLayersQgis( self ):
@@ -559,6 +564,8 @@ class AuxiliaryWindow(QMainWindow):
     for item in layersQgis:
       if item in layers:
         self.ltg.addLayer( item )
+        if isinstance( item, QgsVectorLayer ):
+          item.editCommandEnded.connect( item.triggerRepaint  )
 
   @pyqtSlot('QgsMapLayer')
   def onCurrentLayerQgis(self, layer ):
