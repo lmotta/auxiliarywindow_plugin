@@ -118,7 +118,8 @@ class AuxiliaryLegend( QDockWidget ):
     self.bridge = QgsLayerTreeMapCanvasBridge( ltg, canvas ) # Need wait populate ltg
 
   def clearBridge(self):
-    self.bridge.clear()
+    if not self.bridge is None:
+      self.bridge.clear()
 
   def closeEvent(self, event):
     event.accept()
@@ -567,6 +568,7 @@ class AuxiliaryWindow(QMainWindow):
 
   @pyqtSlot()
   def onAddSelectedLayersQgis( self ):
+    
     self.dockLegend.clearBridge()
 
     layersQgis = map( lambda item: item.layer(), self.qgisTView.selectedLayerNodes() )
