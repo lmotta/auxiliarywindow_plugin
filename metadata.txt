@@ -2,8 +2,10 @@
 name=Auxiliary Window
 description=Plugin for open synchronized window with selected layers
 about=This plugin for open synchronized window with selected layers. 
+  This plugin is similar the "Dockable MirrorMap" plugin, but, the diference is this plugin create a new main window, and not a dockbale window. The plugin have others features.
   The new window can add, remove, show, hide the layers.
   The tools in new windows enable, show the cursor from main window(QGIS window), set the scale, show the extent of main window.
+  See presentation in http://pt.slideshare.net/LuizMotta3/presentation-2015-0701ibamaplugins
   This plugin is developed on the demand of IBAMA(Brazilian Institute of Environment and Renewable Natural Resources)
   http://www.ibama.gov.br
 version=0.2
