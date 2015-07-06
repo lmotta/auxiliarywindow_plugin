@@ -553,7 +553,6 @@ class AuxiliaryWindow(QMainWindow):
 
       self.ltg.removeChildNode( item )
 
-
   @pyqtSlot()
   def onAddSelectedLayersQgis( self ):
     layersQgis = map( lambda item: item.layer(), self.qgisTView.selectedLayerNodes() )

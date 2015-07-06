@@ -36,6 +36,7 @@ class AuxiliaryWindowPlugin:
   def __init__(self, iface):
     self.iface = iface
     self.plugin = ContainerAuxiliaryWindow( iface.mainWindow() )
+    self.namePlugin = "&Auxiliary Window"
 
   def _connect(self, isConnect = True):
     signal_slot = (
@@ -58,10 +59,12 @@ class AuxiliaryWindowPlugin:
     self.action.setStatusTip( title )
     self.action.triggered.connect( self.run )
     self.iface.addToolBarIcon( self.action )
+    self.iface.addPluginToMenu( self.namePlugin, self.action)
     self._connect()
 
   def unload(self):
     self.iface.removeToolBarIcon( self.action )
+    self.iface.removePluginMenu( self.namePlugin, self.action)
     del self.action
     self._connect( False )
     self.plugin.close()

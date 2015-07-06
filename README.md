@@ -12,6 +12,8 @@ Plugin for open synchronized window with selected layers.
 Luiz Motta
 
 ## Changelog
+- 2015-07-05 
+ Add an entry in Plugins menu (ticket #13057 closed)
 - 2015-06-27
  Initial plugin
 
