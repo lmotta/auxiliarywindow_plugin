@@ -117,6 +117,9 @@ class AuxiliaryLegend( QDockWidget ):
     ltg = self.model.rootGroup() 
     self.bridge = QgsLayerTreeMapCanvasBridge( ltg, canvas ) # Need wait populate ltg
 
+  def clearBridge(self):
+    self.bridge.clear()
+
   def closeEvent(self, event):
     event.accept()
     self.closed.emit()
@@ -145,6 +148,7 @@ class AuxiliaryLegend( QDockWidget ):
         self.addSelectedLayersQgis.emit()
       else:
         self.currentLayerQgis.emit( self.tview.currentLayer() )
+
 
 class MarkerWindow():
   def __init__(self, canvas):
@@ -186,6 +190,7 @@ class MarkerWindow():
       self.markerBack.setCenter( point )
     if not self.marker is None:
       self.marker.setCenter( point )
+
 
 class AuxiliaryWindow(QMainWindow):
   
@@ -562,6 +567,8 @@ class AuxiliaryWindow(QMainWindow):
 
   @pyqtSlot()
   def onAddSelectedLayersQgis( self ):
+    self.dockLegend.clearBridge()
+
     layersQgis = map( lambda item: item.layer(), self.qgisTView.selectedLayerNodes() )
     l1 = set( layersQgis )
     l2 = set( map( lambda item: item.layer(), self.ltg.findLayers() ) )
@@ -571,6 +578,8 @@ class AuxiliaryWindow(QMainWindow):
       if item in layers:
         self.ltg.addLayer( item )
         self._connectVectorRefresh( item )
+
+    self.dockLegend.setBridge( self.canvas )
 
   @pyqtSlot( 'QgsMapLayer' )
   def onRemoveLayers( self, layer ):
