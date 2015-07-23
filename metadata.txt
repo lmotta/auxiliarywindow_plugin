@@ -8,13 +8,15 @@ about=This plugin for open synchronized window with selected layers.
   See presentation in http://pt.slideshare.net/LuizMotta3/presentation-2015-0701ibamaplugins
   This plugin is developed on the demand of IBAMA(Brazilian Institute of Environment and Renewable Natural Resources)
   http://www.ibama.gov.br
-version=0.4
+version=0.5
 qgisMinimumVersion=2.8
 # category=
 author=Luiz Motta
 email=motta.luiz@gmail.com
 
-changelog=0.4
+changelog=0.5
+  - Add message box in auxiliary window
+  0.4
   - Update clearBridge, check if self.bridge already initialized
   0.3
   - Update onAddSelectedLayersQgis, added clearBridge, ltg.addLayer has postponed trigger for adding layers. This caused changes in the extent of the windows.

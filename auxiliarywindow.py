@@ -19,7 +19,8 @@ email                : motta.luiz@gmail.com
  ***************************************************************************/
 """
 
-from PyQt4.QtGui import ( QMainWindow, QDockWidget, QIcon, QColor, QAbstractItemView, 
+from PyQt4.QtGui import ( QMainWindow, QWidget, QGridLayout, QSizePolicy, QDockWidget,
+                          QIcon, QColor, QAbstractItemView,
                           QToolBar, QToolButton, QCheckBox, QLabel, QDoubleSpinBox, QAction )
 from PyQt4.QtCore import ( Qt, QRect, QTimer, pyqtSlot, pyqtSignal )
 
@@ -34,12 +35,14 @@ import locale
 import os
 import json
 
+
 class AuxiliaryLegend( QDockWidget ):
 
   currentLayerChanged = pyqtSignal( "QgsMapLayer" )
   currentLayerQgis = pyqtSignal( "QgsMapLayer" )
   addSelectedLayersQgis = pyqtSignal()
   removeLayer = pyqtSignal( "QgsMapLayer" )
+  needSelectLayer = pyqtSignal()
   closed = pyqtSignal()
 
   def __init__( self, parent, numWin ):
@@ -132,6 +135,7 @@ class AuxiliaryLegend( QDockWidget ):
     if nameSender in ( 'showLayer', 'hideLayer', 'removeLayer'):
       nodes = self.tview.selectedLayerNodes()
       if len( nodes ) == 0:
+        self.needSelectLayer.emit()
         return
       
       if nameSender in ( 'showLayer', 'hideLayer'):
@@ -253,17 +257,24 @@ class AuxiliaryWindow(QMainWindow):
       self.addDockWidget ( Qt.LeftDockWidgetArea, self.dockLegend )
       self.actLegend = self.menuBar().addAction("")
       self.actLegend.triggered.connect( self.onActionLegend )
-      self.setCentralWidget( self.canvas )
-
       self.canvas.setMapTool( self.toolPan )
       self.canvas.setCanvasColor( QColor(255,255,255) )
       self.canvas.enableAntiAliasing( False )
       self.canvas.useImageToRender( False )
       self.canvas.setWheelAction( QgsMapCanvas.WheelZoom )
+      self.setCentralWidget( centralWidget )
+      self.messageBar.setSizePolicy( QSizePolicy.Minimum, QSizePolicy.Fixed )
+      layout = QGridLayout()
+      layout.setContentsMargins( 0, 0, 0, 0 )
+      layout.addWidget( self.canvas, 0, 0, 2, 1 )
+      layout.addWidget( self.messageBar, 0, 0, 1, 1 )
+      centralWidget.setLayout( layout )
 
     super( AuxiliaryWindow, self ).__init__( parent )
 
-    self.canvas = QgsMapCanvas(self)
+    centralWidget = QWidget( self )
+    self.canvas = QgsMapCanvas( centralWidget )
+    self.messageBar = QgsMessageBar( centralWidget )
     self.toolPan = QgsMapToolPan( self.canvas )
     self.qgisCanvas = qgis.utils.iface.mapCanvas()
     self.qgisTView = qgis.utils.iface.layerTreeView()
@@ -302,6 +313,7 @@ class AuxiliaryWindow(QMainWindow):
       { 'signal': self.dockLegend.currentLayerQgis, 'slot': self.onCurrentLayerQgis },
       { 'signal': self.dockLegend.addSelectedLayersQgis, 'slot': self.onAddSelectedLayersQgis },
       { 'signal': self.dockLegend.removeLayer, 'slot': self.onRemoveLayers },
+      { 'signal': self.dockLegend.needSelectLayer, 'slot': self.onNeedSelectLayer },
       { 'signal': self.dockLegend.closed, 'slot': self.onClosedLegend },
       { 'signal': self.canvas.extentsChanged, 'slot': self.onExtentsChangedMirror },
       { 'signal': self.qgisCanvas.extentsChanged, 'slot': self.onExtentsChangedQgisCanvas },
@@ -575,11 +587,14 @@ class AuxiliaryWindow(QMainWindow):
     l1 = set( layersQgis )
     l2 = set( map( lambda item: item.layer(), self.ltg.findLayers() ) )
     layers = list( l1 - l2 )
-    # Get order by layersQgis
-    for item in layersQgis:
-      if item in layers:
-        self.ltg.addLayer( item )
-        self._connectVectorRefresh( item )
+    if len( layers ) == 0:
+      self.messageBar.pushMessage("Need select new layer(s) in main map", QgsMessageBar.WARNING, 2 )
+    else:
+      # Get order by layersQgis
+      for item in layersQgis:
+        if item in layers:
+          self.ltg.addLayer( item )
+          self._connectVectorRefresh( item )
 
     self.dockLegend.setBridge( self.canvas )
 
@@ -587,9 +602,15 @@ class AuxiliaryWindow(QMainWindow):
   def onRemoveLayers( self, layer ):
     self._connectVectorRefresh(layer, False)
 
+  @pyqtSlot()
+  def onNeedSelectLayer(self):
+    self.messageBar.pushMessage("Need select layer(s)", QgsMessageBar.WARNING, 2 )    
+
   @pyqtSlot('QgsMapLayer')
   def onCurrentLayerQgis(self, layer ):
-    if not layer is None:
+    if layer is None:
+      self.messageBar.pushMessage("Need active layer", QgsMessageBar.WARNING, 2 )
+    else:
       self.qgisTView.setCurrentLayer( layer )
 
   @pyqtSlot('QgsMapLayer')

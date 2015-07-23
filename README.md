@@ -12,6 +12,8 @@ Plugin for open synchronized window with selected layers.
 Luiz Motta
 
 ## Changelog
+- 2015-07-23
+ Add message box in auxiliary window
 - 2015-07-06 
  Update clearBridge, check if self.bridge already initialized
  Update onAddSelectedLayersQgis, added clearBridge, ltg.addLayer has postponed trigger for adding layers. This caused changes in the extent of the windows.
