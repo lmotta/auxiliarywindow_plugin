@@ -107,7 +107,6 @@ class AuxiliaryLegend( QDockWidget ):
 
       actn = QAction( winLegend )
       actn.setIcon( QIcon( os.path.join( os.path.dirname(__file__), 'mActionAddGroup.png' ) ) )
-      actn.setIconText( self.textSync )
       actn.setObjectName( 'syncGroup' )
       actn.triggered.connect( self.onAction )
       toolBar.addAction( actn )
@@ -125,6 +124,7 @@ class AuxiliaryLegend( QDockWidget ):
     toolBar = QToolBar( winLegend )
     setupUi()
     addActions()
+    self.addNameSyncGroup( "None" )
     winLegend.setCentralWidget( self.tview )
 
   def addNameSyncGroup(self, name):
@@ -301,6 +301,8 @@ class AuxiliaryWindow(QMainWindow):
 
     self.ltg = QgsLayerTreeGroup('', Qt.Unchecked)
     self.dockLegend = AuxiliaryLegend( self, numWin )
+    self.root = QgsProject.instance().layerTreeRoot()
+    
 
     self.extent = self.actLegend = None
     self.marker = MarkerWindow( self.canvas )
@@ -341,6 +343,7 @@ class AuxiliaryWindow(QMainWindow):
       { 'signal': self.qgisCanvas.destinationCrsChanged, 'slot': self.onDestinationCrsChanged_MapUnitsChanged },
       { 'signal': self.qgisCanvas.mapUnitsChanged, 'slot': self.onDestinationCrsChanged_MapUnitsChanged },
       { 'signal': self.qgisCanvas.hasCrsTransformEnabledChanged, 'slot': self.onHasCrsTransformEnabledChanged },
+      { 'signal': self.root.removedChildren, 'slot': self.onRemovedChildrenQgisRoot },
       { 'signal': QgsMapLayerRegistry.instance().layersWillBeRemoved, 'slot': self.onLayersWillBeRemoved }
     )
     if isConnect:
@@ -412,13 +415,22 @@ class AuxiliaryWindow(QMainWindow):
     if len( layersQgis ) == 0:
       return False
 
+    name = ltg.name()
+    if self.qgisSyncGroup == ltg:
+      msg = "Already synchronized group (main map) -> '%s'" % name
+      self.messageBar.pushMessage( msg, QgsMessageBar.INFO, 4 )
+      return True
+    
     if not self.qgisSyncGroup is None:
-      self.qgisSyncGroup.addedChildren .disconnect( self.addChildrenLayer )
+      self.qgisSyncGroup.addedChildren.disconnect( self.addedChildrenLayer )
       
     self.qgisSyncGroup = ltg
-    self.qgisSyncGroup.addedChildren .connect( self.addChildrenLayer )
+    self.qgisSyncGroup.addedChildren.connect( self.addedChildrenLayer )
     
-    self.dockLegend.addNameSyncGroup( ltg.name() )
+    self.dockLegend.addNameSyncGroup( name )
+    msg = "Changed synchronized group (main map) -> '%s'" % name
+    self.messageBar.pushMessage( msg, QgsMessageBar.INFO, 4 )
+    
     self._addLayersQgis( layersQgis )
     return True
 
@@ -431,7 +443,7 @@ class AuxiliaryWindow(QMainWindow):
       if not isinstance( ltn, QgsLayerTreeGroup ):
         return False
       else:
-        if ltn == QgsProject.instance().layerTreeRoot():
+        if ltn == self.root:
           return False
         else:
           if not self._syncGroupAddLayersQgis( ltn ):
@@ -647,16 +659,25 @@ class AuxiliaryWindow(QMainWindow):
     self._addLayersQgis( layersQgis )
 
   @pyqtSlot('QgsLayerTreeNode', int, int)
-  def addChildrenLayer(self, ltg, indexFrom, indexTo):
+  def addedChildrenLayer(self, ltg, indexFrom, indexTo):
     layersQgis = map( lambda item: item.layer(), ltg.findLayers() )
     self._addLayersQgis( layersQgis, False )
+
+  @pyqtSlot('QgsLayerTreeNode', int, int)
+  def onRemovedChildrenQgisRoot(self, ltg, indexFrom, indexTo):
+    if not self.qgisSyncGroup is None and not self.qgisSyncGroup in self.root.children():
+      self.qgisSyncGroup = None
+      self.dockLegend.addNameSyncGroup( "None" )
+      msg = "Removed synchronized group (main map)"
+      self.messageBar.pushMessage( msg, QgsMessageBar.INFO, 4 )
+      
       
   @pyqtSlot()
   def onSyncGroupAddLayersQgis( self):
     
     msg = "Need active a group in main map with new layers"
     ltn = self.qgisTView.currentNode()
-    if not isinstance( ltn, QgsLayerTreeGroup ) or ltn == QgsProject.instance().layerTreeRoot():
+    if not isinstance( ltn, QgsLayerTreeGroup ) or ltn == self.root:
       self.messageBar.pushMessage( msg, QgsMessageBar.WARNING, 3 )
       return
 
