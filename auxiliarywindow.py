@@ -278,6 +278,7 @@ class AuxiliaryWindow(QMainWindow):
     self.toolPan = QgsMapToolPan( self.canvas )
     self.qgisCanvas = qgis.utils.iface.mapCanvas()
     self.qgisTView = qgis.utils.iface.layerTreeView()
+    self.qgisSyncGroup = None
     self.numWin = numWin
 
     self.ltg = QgsLayerTreeGroup('', Qt.Unchecked)
@@ -368,12 +369,40 @@ class AuxiliaryWindow(QMainWindow):
       f = layer.editCommandEnded.connect if isConnect else layer.editCommandEnded.disconnect
       f( self.canvas.refresh )
 
-  def run(self):
-
-    if len( self.qgisTView.selectedLayerNodes() ) == 0:
-      return False
+  def _addLayersQgis( self, layersQgis, needMsg=True ):
     
-    self.onAddSelectedLayersQgis()
+    self.dockLegend.clearBridge()
+
+    l1 = set( layersQgis )
+    l2 = set( map( lambda item: item.layer(), self.ltg.findLayers() ) )
+    layers = list( l1 - l2 )
+    if len( layers ) == 0:
+      if needMsg:
+        self.messageBar.pushMessage("Need select new layer(s) in main map", QgsMessageBar.WARNING, 2 )
+    else:
+      # Get order by layersQgis
+      for item in layersQgis:
+        if item in layers:
+          self.ltg.addLayer( item )
+          self._connectVectorRefresh( item )
+
+    self.dockLegend.setBridge( self.canvas )
+
+  def run(self):
+    
+    if len( self.qgisTView.selectedLayerNodes() ) > 0:
+      self.onAddSelectedLayersQgis()
+    else:
+      ltn = self.qgisTView.currentNode()
+      if not isinstance( ltn, QgsLayerTreeGroup ):
+        return False
+      else:
+        if ltn == QgsProject.instance().layerTreeRoot():
+          return False
+        else:
+          if not self.onSyncGroupAddLayersQgis( ltn ):
+            return False
+
     self.dockLegend.setBridge( self.canvas)
 
     self.canvas.setRenderFlag( False )
@@ -580,23 +609,28 @@ class AuxiliaryWindow(QMainWindow):
 
   @pyqtSlot()
   def onAddSelectedLayersQgis( self ):
-    
-    self.dockLegend.clearBridge()
-
     layersQgis = map( lambda item: item.layer(), self.qgisTView.selectedLayerNodes() )
-    l1 = set( layersQgis )
-    l2 = set( map( lambda item: item.layer(), self.ltg.findLayers() ) )
-    layers = list( l1 - l2 )
-    if len( layers ) == 0:
-      self.messageBar.pushMessage("Need select new layer(s) in main map", QgsMessageBar.WARNING, 2 )
-    else:
-      # Get order by layersQgis
-      for item in layersQgis:
-        if item in layers:
-          self.ltg.addLayer( item )
-          self._connectVectorRefresh( item )
+    self._addLayersQgis( layersQgis )
 
-    self.dockLegend.setBridge( self.canvas )
+  @pyqtSlot('QgsLayerTreeNode', int, int)
+  def addChildrenLayer(self, ltg, indexFrom, indexTo):
+    layersQgis = map( lambda item: item.layer(), ltg.findLayers() )
+    self._addLayersQgis( layersQgis, False )
+      
+  @pyqtSlot('QgsLayerTreeGroup')
+  def onSyncGroupAddLayersQgis( self, ltg ):
+    layersQgis = map( lambda item: item.layer(), ltg.findLayers() )
+    if len( layersQgis ) == 0:
+      return False
+
+    if not self.qgisSyncGroup is None:
+      self.qgisSyncGroup.addedChildren .disconnect( self.addChildrenLayer )
+      
+    self.qgisSyncGroup = ltg
+    self.qgisSyncGroup.addedChildren .connect( self.addChildrenLayer )
+    
+    self._addLayersQgis( layersQgis )
+    return True
 
   @pyqtSlot( 'QgsMapLayer' )
   def onRemoveLayers( self, layer ):
@@ -646,7 +680,7 @@ class ContainerAuxiliaryWindow():
     if not self.windows[ self.numWin ].run():
       del  self.windows[ self.numWin ]
       self.numWin -= 1
-      msg = "Need selected layers in legend."
+      msg = "Need selected layers in legend or group with layers."
       msgBar = qgis.utils.iface.messageBar()
       msgBar.pushMessage( self.pluginName, msg, QgsMessageBar.CRITICAL, 4 )
     else:
