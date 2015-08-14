@@ -12,6 +12,8 @@ Plugin for open synchronized window with selected layers.
 Luiz Motta
 
 ## Changelog
+- 2015-08-14
+ Add synchronization of group for new layers
 - 2015-07-23
  Add message box in auxiliary window
 - 2015-07-06 
