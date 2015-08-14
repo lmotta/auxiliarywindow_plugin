@@ -40,6 +40,7 @@ class AuxiliaryLegend( QDockWidget ):
 
   currentLayerChanged = pyqtSignal( "QgsMapLayer" )
   currentLayerQgis = pyqtSignal( "QgsMapLayer" )
+  syncGroupLayer = pyqtSignal()
   addSelectedLayersQgis = pyqtSignal()
   removeLayer = pyqtSignal( "QgsMapLayer" )
   needSelectLayer = pyqtSignal()
@@ -104,10 +105,20 @@ class AuxiliaryLegend( QDockWidget ):
       actn.triggered.connect( self.onAction )
       toolBar.addAction( actn )
 
+      actn = QAction( winLegend )
+      actn.setIcon( QIcon( os.path.join( os.path.dirname(__file__), 'mActionAddGroup.png' ) ) )
+      actn.setIconText( self.textSync )
+      actn.setObjectName( 'syncGroup' )
+      actn.triggered.connect( self.onAction )
+      toolBar.addAction( actn )
+
+
     super( AuxiliaryLegend, self ).__init__( "#%d - Layers" % numWin, parent )
 
     ltg = parent.ltg    
     self.tview = self.model = self.bridge = None
+    self.textSync = "Sync with group(main map) for new layers"
+    self.actSync = None
     setTreeView()
 
     winLegend = QMainWindow( self )
@@ -115,6 +126,11 @@ class AuxiliaryLegend( QDockWidget ):
     setupUi()
     addActions()
     winLegend.setCentralWidget( self.tview )
+
+  def addNameSyncGroup(self, name):
+    act = self.findChild( QAction, 'syncGroup' )
+    text = "%s -> %s" % ( self.textSync, name )
+    act.setIconText( text )
 
   def setBridge(self, canvas):
     ltg = self.model.rootGroup() 
@@ -151,8 +167,10 @@ class AuxiliaryLegend( QDockWidget ):
     else: 
       if nameSender == 'addLayer':
         self.addSelectedLayersQgis.emit()
-      else:
+      elif nameSender == 'currentLayer':
         self.currentLayerQgis.emit( self.tview.currentLayer() )
+      else:
+        self.syncGroupLayer.emit()
 
 
 class MarkerWindow():
@@ -312,6 +330,7 @@ class AuxiliaryWindow(QMainWindow):
       { 'signal': widgets['scaleFactorSpin'].valueChanged, 'slot': self.onValueChangedScale },
       { 'signal': self.dockLegend.currentLayerChanged, 'slot': self.onCurrentLayerChanged },
       { 'signal': self.dockLegend.currentLayerQgis, 'slot': self.onCurrentLayerQgis },
+      { 'signal': self.dockLegend.syncGroupLayer, 'slot': self.onSyncGroupAddLayersQgis },
       { 'signal': self.dockLegend.addSelectedLayersQgis, 'slot': self.onAddSelectedLayersQgis },
       { 'signal': self.dockLegend.removeLayer, 'slot': self.onRemoveLayers },
       { 'signal': self.dockLegend.needSelectLayer, 'slot': self.onNeedSelectLayer },
@@ -388,6 +407,21 @@ class AuxiliaryWindow(QMainWindow):
 
     self.dockLegend.setBridge( self.canvas )
 
+  def _syncGroupAddLayersQgis( self, ltg ):
+    layersQgis = map( lambda item: item.layer(), ltg.findLayers() )
+    if len( layersQgis ) == 0:
+      return False
+
+    if not self.qgisSyncGroup is None:
+      self.qgisSyncGroup.addedChildren .disconnect( self.addChildrenLayer )
+      
+    self.qgisSyncGroup = ltg
+    self.qgisSyncGroup.addedChildren .connect( self.addChildrenLayer )
+    
+    self.dockLegend.addNameSyncGroup( ltg.name() )
+    self._addLayersQgis( layersQgis )
+    return True
+
   def run(self):
     
     if len( self.qgisTView.selectedLayerNodes() ) > 0:
@@ -400,7 +434,7 @@ class AuxiliaryWindow(QMainWindow):
         if ltn == QgsProject.instance().layerTreeRoot():
           return False
         else:
-          if not self.onSyncGroupAddLayersQgis( ltn ):
+          if not self._syncGroupAddLayersQgis( ltn ):
             return False
 
     self.dockLegend.setBridge( self.canvas)
@@ -617,20 +651,17 @@ class AuxiliaryWindow(QMainWindow):
     layersQgis = map( lambda item: item.layer(), ltg.findLayers() )
     self._addLayersQgis( layersQgis, False )
       
-  @pyqtSlot('QgsLayerTreeGroup')
-  def onSyncGroupAddLayersQgis( self, ltg ):
-    layersQgis = map( lambda item: item.layer(), ltg.findLayers() )
-    if len( layersQgis ) == 0:
-      return False
-
-    if not self.qgisSyncGroup is None:
-      self.qgisSyncGroup.addedChildren .disconnect( self.addChildrenLayer )
-      
-    self.qgisSyncGroup = ltg
-    self.qgisSyncGroup.addedChildren .connect( self.addChildrenLayer )
+  @pyqtSlot()
+  def onSyncGroupAddLayersQgis( self):
     
-    self._addLayersQgis( layersQgis )
-    return True
+    msg = "Need active a group in main map with new layers"
+    ltn = self.qgisTView.currentNode()
+    if not isinstance( ltn, QgsLayerTreeGroup ) or ltn == QgsProject.instance().layerTreeRoot():
+      self.messageBar.pushMessage( msg, QgsMessageBar.WARNING, 3 )
+      return
+
+    if not self._syncGroupAddLayersQgis( ltn ):
+      self.messageBar.pushMessage( msg, QgsMessageBar.WARNING, 3 )
 
   @pyqtSlot( 'QgsMapLayer' )
   def onRemoveLayers( self, layer ):
